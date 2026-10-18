@@ -130,8 +130,23 @@ rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/dex"
   -classpath "$PLATFORM_JAR" -d "$OUT/classes" \
   $(find "$HERE/src" -name '*.java')
 
-"$BT/d8" --min-api 26 --lib "$PLATFORM_JAR" \
-  --output "$OUT/dex" $(find "$OUT/classes" -name '*.class')
+# d8 before build-tools 35 dies with an internal NullPointerException on the
+# MethodParameters attribute that javac 21 and later write; a builder pinned to
+# older build-tools (F-Droid's, whose SDK is limited by a transparency log)
+# stops there. The attribute holds parameter names, which a dex never carries,
+# so if the dexer refuses the classes we drop it and dex again.  With a dexer
+# that reads it -- build-tools 36, say -- nothing is touched and nothing differs.
+dex() {
+  "$BT/d8" --min-api 26 --lib "$PLATFORM_JAR" \
+    --output "$OUT/dex" $(find "$OUT/classes" -name '*.class')
+}
+if ! dex 2> "$OUT/d8.log"; then
+  echo "  dexer     : $(sed -n '2p' "$OUT/d8.log" | cut -c1-66)"
+  echo "  retrying after dropping MethodParameters (parameter names are not dex data)"
+  python3 "$HERE/strip-parameters.py" "$OUT/classes"
+  rm -f "$OUT/dex/classes.dex"
+  dex
+fi
 
 python3 - "$OUT/base.apk" "$OUT/dex/classes.dex" <<'PY'
 import sys, zipfile

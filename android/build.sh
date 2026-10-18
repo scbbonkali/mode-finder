@@ -69,10 +69,12 @@ KS_PASS="${KS_PASS:-}"
 if [ -z "$KS_PASS" ] && [ -r "$HERE/../.keystore-password" ]; then
   KS_PASS="$(tr -d '\r\n' < "$HERE/../.keystore-password")"
 fi
-[ -n "$KS_PASS" ] || {
-  echo "ERROR: no keystore password: set KS_PASS, or write it to ../.keystore-password"
+if [ -z "$KS_PASS" ] && [ -f "$KS" ]; then
+  echo "ERROR: this keystore needs its password: set KS_PASS, or write it to ../.keystore-password"
   exit 1
-}
+fi
+# A clone has neither a key nor a password. That is not an error -- step 4 makes
+# both, so `git clone && android/build.sh` builds an installable APK anywhere.
 OUT="$HERE/build"
 
 echo "toolchain : $BT"
@@ -117,10 +119,19 @@ PY
 "$BT/zipalign" -f -p 4 "$OUT/base.apk" "$OUT/aligned.apk"
 
 if [ ! -f "$KS" ]; then
+  if [ -z "$KS_PASS" ]; then
+    KS_PASS="$(python3 -c 'import secrets, string
+print("".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(24)))')"
+    printf '%s\n' "$KS_PASS" > "$HERE/../.keystore-password"
+    chmod 600 "$HERE/../.keystore-password"
+  fi
   "$JDK/bin/keytool" -genkeypair -keystore "$KS" -alias modes -keyalg RSA \
     -keysize 2048 -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" \
     -dname "CN=Mode Finder, OU=modes, O=scbb, C=IE" >/dev/null 2>&1
-  echo "key       : new signing key written to $KS (password '$KS_PASS')"
+  echo "key       : no key here, so one was made for this build: $KS"
+  echo "            its password is in ../.keystore-password, which is ignored."
+  echo "            This is a different app identity: a phone carrying the released"
+  echo "            build must uninstall it before it will accept this one."
 fi
 
 "$BT/apksigner" sign --ks "$KS" --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" \

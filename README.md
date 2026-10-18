@@ -21,19 +21,27 @@ pentatonic, Hirajoshi, In-sen and the rest).
 
 ## Download
 
-**The APK:** [releases/latest](https://github.com/scbbonkali/mode-finder/releases) —
-[`mode-finder-1.0.apk`](https://github.com/scbbonkali/mode-finder/releases/download/v1.0/mode-finder-1.0.apk)
+**One click, always the newest:**
+[`mode-finder.apk`](https://github.com/scbbonkali/mode-finder/releases/latest/download/mode-finder.apk)
+— the file name never changes, so that link always serves the latest release, and
+[the releases page](https://github.com/scbbonkali/mode-finder/releases) has every
+version ever published.
 
+<!-- hashes:start -->
 ```
-29,384 bytes
+29384 bytes
 md5    e7121b791205a754d540a71c7330ed28
 sha256 cf4500f69da32c34c6b04aac0d6d6c072a25a4d2a86f407aed84b8301a65ca79
 ```
 
+Mode Finder 1.0
+<!-- hashes:end -->
+
 Android 8.0 or newer: download it, open it, and allow installs from this source.
 An update installs straight over the previous version — the signing key does not
-change — and a build from this source will produce the same bytes, so the hashes
-above can be checked against a locally built APK.
+change — and a build from this source produces the same bytes, so the hashes above
+can be checked against an APK built here. `release.sh` rewrites that block on every
+release, so it never goes stale.
 
 **Keep it updated:** add `https://github.com/scbbonkali/mode-finder` to
 [Obtainium](https://github.com/ImranR98/Obtainium/releases) and every future release

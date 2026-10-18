@@ -43,6 +43,18 @@ MD5="$(md5sum "$APK" | cut -d' ' -f1)"
 SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
 SIZE="$(wc -c < "$APK")"
 
+# --- keep the README's hashes true -----------------------------------------
+python3 - "$VERSION" "$SIZE" "$MD5" "$SHA" <<'PY'
+import re, sys
+ver, size, md5, sha = sys.argv[1:5]
+block = "```\n%s bytes\nmd5    %s\nsha256 %s\n```\n\nMode Finder %s" % (size, md5, sha, ver)
+text = open("README.md").read()
+text, n = re.subn(r"(?s)(<!-- hashes:start -->\n).*?(\n<!-- hashes:end -->)",
+                  lambda m: m.group(1) + block + m.group(2), text)
+open("README.md", "w").write(text)
+print("readme   : hash block", "updated" if n else "MARKERS NOT FOUND")
+PY
+
 # --- commit, tag, push -----------------------------------------------------
 git add -A
 git commit -q -m "$VERSION: ${NOTES:-release}"
@@ -79,8 +91,8 @@ rel = api("https://api.github.com/repos/%s/releases" % slug, json.dumps({
     "draft": False, "prerelease": False}).encode())
 print("release  :", rel["html_url"])
 
-asset = api("https://uploads.github.com/repos/%s/releases/%d/assets?name=mode-finder-%s.apk"
-            % (slug, rel["id"], ver),
+asset = api("https://uploads.github.com/repos/%s/releases/%d/assets?name=mode-finder.apk"
+            % (slug, rel["id"]),
             open(apk, "rb").read(), "application/vnd.android.package-archive")
 print("asset    :", asset["name"], asset["size"], "bytes")
 print("download :", asset["browser_download_url"])

@@ -135,3 +135,9 @@ refuses to update an installed app with a differently signed APK, so the file ha
 to survive; anyone forking this project to publish their own builds should make
 their own key rather than reuse this one. It is a sideloading key; a Play release
 would want a properly kept upload key instead.
+
+A clone has neither the key nor its password, and that is not an error: the first
+build generates a key, invents a password, and writes it to the ignored
+`.keystore-password` beside the repository. So `git clone` and `android/build.sh`
+produce an installable APK anywhere — this project's app, signed by somebody else,
+which Android treats as a different app.

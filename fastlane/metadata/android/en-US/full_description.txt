@@ -1,0 +1,34 @@
+Mode Finder is a reference for guitar players: choose a root and a mode, and the
+neck shows every note that belongs to it, with the root called out.
+
+It is meant to be looked at while playing. The fretboard runs from the open
+string to fret 24, with double dots at 12 and 24, so nothing is cut off. Notes
+outside the scale are dimmed to near-black rather than removed, so the shape of
+the mode stands out against the rest of the neck.
+
+Three families of modes are included: the modes of the major scale, of the
+harmonic minor and of the melodic minor. Spellings are worked out, not typed in:
+every note is found by walking the letters and choosing the accidentals that
+need the fewest signs, so A Aeolian reads as A B C D E F G rather than as a row
+of sharps.
+
+Variants are the other half of the idea. Drop two of the seven degrees and see
+which five-note shape is left: minor pentatonic, major pentatonic, Hirajoshi,
+In-sen, Man Gong, Egyptian and the rest. The two notes that were dropped stay on
+the neck, dimmed and struck through, so the difference is visible rather than
+implied.
+
+The app is a single HTML file with everything inside it: about 29 KB, no
+network, no permissions, no analytics, no ads. It never asks for the INTERNET
+permission, so it could not reach anywhere even if it tried. It works in
+aeroplane mode, in a basement, forever.
+
+The theory is computed rather than stored as tables: the parent scale by
+rotating the mode's step pattern, the note spellings by a letter walk with the
+fewest accidentals, and the variants by masking two degrees and looking the
+resulting pitch-class set up in a shape table. If the arithmetic were wrong
+anywhere, it would be wrong visibly.
+
+Source code, the browser version and the build script are all in the repository.
+The build is reproducible: the same sources and the same toolchain produce the
+same bytes, and every release lists the md5 and sha256 of the APK.

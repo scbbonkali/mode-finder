@@ -40,6 +40,12 @@ exactly what to build with.
 | `BT_VERSION` | newest build-tools | which `aapt2` and `d8` to use |
 | `PLATFORM_API` | newest platform | which `android.jar` to link against |
 | `JAVA_HOME` | first JDK with `javac` | which compiler to use |
+| `UNSIGNED` | off | set to `1` to stop after aligning: no key, no signature |
+
+`UNSIGNED=1` writes `mode-finder-unsigned.apk` instead of `mode-finder.apk`: the
+same contents, aligned, but unsigned, with no key read, made or used. That is what
+a build service wants — F-Droid's `output:` field asks for "the resulting unsigned
+release APK", and F-Droid signs whatever it publishes with its own key.
 
 An unknown version fails immediately rather than quietly building with something
 else:

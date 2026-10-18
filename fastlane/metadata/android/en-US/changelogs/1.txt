@@ -1,0 +1,9 @@
+First release.
+
+Pick a root and a mode: the neck shows every note of the scale with the root
+outlined and the notes outside it dimmed. Three families of modes (major,
+harmonic minor, melodic minor), a spelling preference, and variants: drop two
+degrees from any mode and see which five-note shape is left, with the dropped
+notes struck through.
+
+Offline, no permissions, no ads. About 29 KB.

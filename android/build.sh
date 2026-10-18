@@ -24,6 +24,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 #   BT_VERSION                        build-tools to use (default: newest)
 #   PLATFORM_API                      platform to link against (default: newest)
 #   JAVA_HOME                         a JDK with javac (default: first found)
+#   UNSIGNED=1                        stop after aligning: no key, no signature
 #
 # Pinning matters twice over. This build is byte-for-byte reproducible, but only
 # while the tools are the same ones: `aapt2` and `d8` output can change between
@@ -115,30 +116,39 @@ with zipfile.ZipFile(apk, "a", zipfile.ZIP_STORED) as z:
     z.writestr(zi, open(dex, "rb").read())
 PY
 
-# --- 4. align and sign ----------------------------------------------------
+# --- 4. align, then sign unless a bare APK was asked for -------------------
+#   UNSIGNED=1 leaves the aligned APK unsigned, which is what a build service
+#   wants: F-Droid signs everything it publishes with its own key, and it has no
+#   business holding ours. It also means a build service needs no keytool.
 "$BT/zipalign" -f -p 4 "$OUT/base.apk" "$OUT/aligned.apk"
 
-if [ ! -f "$KS" ]; then
-  if [ -z "$KS_PASS" ]; then
-    KS_PASS="$(python3 -c 'import secrets, string
+if [ -n "${UNSIGNED:-}" ]; then
+  APK="$HERE/$APK_NAME-unsigned.apk"
+  cp -f "$OUT/aligned.apk" "$APK"
+  echo "key       : none: UNSIGNED=1, so no key was read, made or used"
+else
+  APK="$HERE/$APK_NAME.apk"
+  if [ ! -f "$KS" ]; then
+    if [ -z "$KS_PASS" ]; then
+      KS_PASS="$(python3 -c 'import secrets, string
 print("".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(24)))')"
-    printf '%s\n' "$KS_PASS" > "$HERE/../.keystore-password"
-    chmod 600 "$HERE/../.keystore-password"
+      printf '%s\n' "$KS_PASS" > "$HERE/../.keystore-password"
+      chmod 600 "$HERE/../.keystore-password"
+    fi
+    "$JDK/bin/keytool" -genkeypair -keystore "$KS" -alias modes -keyalg RSA \
+      -keysize 2048 -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" \
+      -dname "CN=Mode Finder, OU=modes, O=scbb, C=IE" >/dev/null 2>&1
+    echo "key       : no key here, so one was made for this build: $KS"
+    echo "            its password is in ../.keystore-password, which is ignored."
+    echo "            This is a different app identity: a phone carrying the released"
+    echo "            build must uninstall it before it will accept this one."
   fi
-  "$JDK/bin/keytool" -genkeypair -keystore "$KS" -alias modes -keyalg RSA \
-    -keysize 2048 -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" \
-    -dname "CN=Mode Finder, OU=modes, O=scbb, C=IE" >/dev/null 2>&1
-  echo "key       : no key here, so one was made for this build: $KS"
-  echo "            its password is in ../.keystore-password, which is ignored."
-  echo "            This is a different app identity: a phone carrying the released"
-  echo "            build must uninstall it before it will accept this one."
+
+  "$BT/apksigner" sign --ks "$KS" --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" \
+    --out "$APK" "$OUT/aligned.apk"
 fi
 
-"$BT/apksigner" sign --ks "$KS" --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" \
-  --out "$HERE/$APK_NAME.apk" "$OUT/aligned.apk"
-
 # --- 5. report what was actually built ------------------------------------
-APK="$HERE/$APK_NAME.apk"
 BUNDLED_MD5=$(python3 -c "
 import zipfile, hashlib
 print(hashlib.md5(zipfile.ZipFile('$APK').read('assets/mobile.html')).hexdigest())")
@@ -159,5 +169,9 @@ echo "  source mobile.html   : $SRC_MD5"
 echo "  bundled in the APK   : $BUNDLED_MD5"
 if [ "$SRC_MD5" = "$BUNDLED_MD5" ]; then echo "  -> the app carries the exact file we tested"; else echo "  -> MISMATCH"; exit 1; fi
 grep -c MainActivity "$OUT/dex/classes.dex" >/dev/null && echo "  dex                  : MainActivity present"
-"$BT/apksigner" verify --print-certs "$APK" | head -4 | sed 's/^/  /'
+if [ -z "${UNSIGNED:-}" ]; then
+  "$BT/apksigner" verify --print-certs "$APK" | head -4 | sed 's/^/  /'
+else
+  echo "  signature            : none -- unsigned on purpose, for a builder that signs"
+fi
 echo "=========================================================================="

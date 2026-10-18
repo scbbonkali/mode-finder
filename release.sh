@@ -40,6 +40,7 @@ echo "version  : $VERSION   (versionCode $VC -> $NEW)"
 "$HERE/android/build.sh" | tail -16
 APK="$HERE/android/mode-finder.apk"
 MD5="$(md5sum "$APK" | cut -d' ' -f1)"
+SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
 SIZE="$(wc -c < "$APK")"
 
 # --- commit, tag, push -----------------------------------------------------
@@ -51,17 +52,18 @@ git push -q origin "v$VERSION"
 echo "pushed   : $(git rev-parse --short HEAD)  $(git rev-parse --abbrev-ref HEAD)  tag v$VERSION"
 
 # --- release with the APK attached -----------------------------------------
-python3 - "$TOK" "$REPO_SLUG" "$VERSION" "$MD5" "$SIZE" "$NOTES" "$APK" <<'PY'
+python3 - "$TOK" "$REPO_SLUG" "$VERSION" "$MD5" "$SHA" "$SIZE" "$NOTES" "$APK" <<'PY'
 import json, sys, urllib.request
 
-tok, slug, ver, md5, size, notes, apk = sys.argv[1:8]
+tok, slug, ver, md5, sha, size, notes, apk = sys.argv[1:9]
 body = ((notes + "\n\n") if notes else "") + (
     "**Install:** download the APK below and open it — Android will ask to allow "
     "installs from this source. Install it over the previous version: the "
     "signature matches, so nothing is lost.\n\n"
     "**Update:** in Obtainium, add `https://github.com/%s` once and it will "
     "offer every future release.\n\n"
-    "`md5 %s`  ·  %s bytes  ·  minSdk 26, targetSdk 34" % (slug, md5, size))
+    "```\n%s bytes\nmd5    %s\nsha256 %s\n```\n\n"
+    "minSdk 26, targetSdk 34" % (slug, size, md5, sha))
 
 
 def api(url, data=None, ctype="application/json"):

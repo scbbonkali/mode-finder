@@ -19,6 +19,33 @@ pentatonic, Hirajoshi, In-sen and the rest).
   variants by masking two degrees and looking the resulting pitch-class set up
   in a shape table.
 
+## Download
+
+**The APK:** [releases/latest](https://github.com/scbbonkali/mode-finder/releases) —
+[`mode-finder-1.0.apk`](https://github.com/scbbonkali/mode-finder/releases/download/v1.0/mode-finder-1.0.apk)
+
+```
+29,384 bytes
+md5    e7121b791205a754d540a71c7330ed28
+sha256 cf4500f69da32c34c6b04aac0d6d6c072a25a4d2a86f407aed84b8301a65ca79
+```
+
+Android 8.0 or newer: download it, open it, and allow installs from this source.
+An update installs straight over the previous version — the signing key does not
+change — and a build from this source will produce the same bytes, so the hashes
+above can be checked against a locally built APK.
+
+**Keep it updated:** add `https://github.com/scbbonkali/mode-finder` to
+[Obtainium](https://github.com/ImranR98/Obtainium/releases) and every future release
+is offered to the phone; Obtainium also refuses an update whose signing key does not
+match the installed app.
+
+**Or build it yourself** — about five seconds, see [Building](#building). The APK is
+deliberately *not* committed to this repository: the released file is the single
+source of truth, with one hash to check against, and a copy in the tree would be a
+second thing to keep in step. The build is reproducible, so the two agree by
+construction (see [android/README.md](android/README.md)).
+
 ## The repository
 
 | path | what it is |

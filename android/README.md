@@ -147,3 +147,20 @@ build generates a key, invents a password, and writes it to the ignored
 `.keystore-password` beside the repository. So `git clone` and `android/build.sh`
 produce an installable APK anywhere — this project's app, signed by somebody else,
 which Android treats as a different app.
+
+### Why the dexer may be run twice
+
+javac 21 and later write a `MethodParameters` attribute into every method. The
+`d8` in build-tools 34 cannot read it: it dies with an internal
+NullPointerException, which is exactly what happened when F-Droid's build server
+(build-tools 34, javac 21) first built this app. `strip-parameters.py` removes
+that one attribute and `build.sh` calls it **only after `d8` has actually refused
+the classes** -- so with build-tools 36 nothing is dropped and the APK stays
+byte-for-byte the published one. The attribute carries parameter names, and a dex
+carries none, so nothing the app does depends on it.
+
+The F-Droid recipe for this app is `metadata/net.scbb.modefinder.yml` in
+`fdroid/fdroiddata` (filed as merge request !53009). It installs
+`platforms;android-36` and `build-tools;34.0.0` -- the newest pair F-Droid's SDK
+transparency log can verify -- builds with `UNSIGNED=1`, and leaves the APK for
+F-Droid to sign with its own key.

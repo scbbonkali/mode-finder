@@ -55,14 +55,31 @@ Two builds of this source, seconds apart, produce APKs with the same md5:
 chain writes a clock or a random value — `aapt2` stamps every zip entry
 1980-01-01, `d8` is deterministic, and an RSA signature is deterministic too.
 
-That is what would let F-Droid verify and redistribute *this* signed APK rather
-than signing a copy of its own. It holds only while the tools are the same ones,
-which is what the pinning above is for. To reproduce a published release:
+What does and does not change the output, measured rather than assumed:
+
+| input | matters? | how much |
+|---|---|---|
+| build-tools version (`aapt2`, `d8`) | yes | they write the resources and the dex |
+| platform version (`android.jar`) | yes | it is the link target |
+| the compiler (`javac`) | **yes** | JDK 26 writes `MainActivity$1.class` at 944 bytes, JDK 17 at 903. One anonymous inner class, and the dex moves with it: 3700 vs 3584 bytes |
+| the JVM that runs `d8` | **no** | identical dex under JDK 17, JDK 26 and Temurin 17 — `d8` reads class files, not the runtime |
+
+So reproducing a published release means naming the three that matter, not two.
+The v1.0 APK was built with JDK 26:
 
 ```sh
-BT_VERSION=36.0.0 PLATFORM_API=36 ./build.sh
+JAVA_HOME=/usr/lib/jvm/java-26-openjdk BT_VERSION=36.0.0 PLATFORM_API=36 ./build.sh
 md5sum mode-finder.apk        # must equal the md5 printed on the release page
 ```
+
+`JAVA_HOME` selects the compiler, and the compiler half of a JDK is the half that
+matters. The `d8` script ignores `JAVA_HOME` and runs whatever `java` is on
+`PATH` — which, happily, makes no difference at all.
+
+That is what would let F-Droid verify and redistribute *this* signed APK rather
+than signing a copy of its own, provided its build server compiles with the same
+`javac`. It is also the reason this wrapper is plain platform API with nothing to
+fetch: the fewer inputs, the fewer things to pin.
 
 ## Install on the phone
 

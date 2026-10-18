@@ -27,8 +27,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 #
 # Pinning matters twice over. This build is byte-for-byte reproducible, but only
 # while the tools are the same ones: `aapt2` and `d8` output can change between
-# build-tools releases. So another machine -- F-Droid's build server, say -- must
-# be told which versions the published APK was made with, not left to guess.
+# build-tools releases, and `javac` writes a differently shaped anonymous class
+# in different JDK majors. So another machine -- F-Droid's build server, say --
+# must be told which versions the published APK was made with, not left to guess.
 find_sdk() {
   for d in "${ANDROID_SDK_ROOT:-}" "${ANDROID_HOME:-}" \
            /opt/android-sdk "$HOME/Projects/android-sdk" \

@@ -22,7 +22,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 #
 #   ANDROID_SDK_ROOT / ANDROID_HOME   where the SDK lives
 #   BT_VERSION                        build-tools to use (default: newest)
-#   PLATFORM_API                      platform to link against (default: newest)
+#   PLATFORM_API                      platform to link against, e.g. 34 or
+#                                     android-34 (default: newest with a jar)
 #   JAVA_HOME                         a JDK with javac (default: first found)
 #   UNSIGNED=1                        stop after aligning: no key, no signature
 #
@@ -45,9 +46,35 @@ BT_VERSION="${BT_VERSION:-$(ls "$SDK/build-tools" | sort -V | tail -1)}"
 BT="$SDK/build-tools/$BT_VERSION"
 [ -x "$BT/aapt2" ] || { echo "ERROR: build-tools $BT_VERSION not installed under $SDK"; exit 1; }
 
-PLATFORM_API="${PLATFORM_API:-$(ls "$SDK/platforms" | sed 's/^android-//' | sort -n | tail -1)}"
-PLATFORM_JAR="$SDK/platforms/android-$PLATFORM_API/android.jar"
-[ -f "$PLATFORM_JAR" ] || { echo "ERROR: no android.jar for platform $PLATFORM_API"; exit 1; }
+# A platform directory with no android.jar cannot link anything, and a stub looks
+# exactly like a real platform until aapt2 asks it for the framework. So take the
+# newest platform that really carries a jar, and when one was asked for by name and
+# is absent, say plainly what is there and how to get it -- a build service's log
+# is not the place to decode "no android.jar for platform".
+with_jar() {
+  for d in "$SDK"/platforms/android-*; do
+    [ -f "$d/android.jar" ] || continue
+    basename "$d" | sed 's/^android-//'
+  done
+}
+if [ -n "${PLATFORM_API:-}" ]; then
+  PLATFORM_API="${PLATFORM_API#android-}"
+  PLATFORM_JAR="$SDK/platforms/android-$PLATFORM_API/android.jar"
+  if [ ! -f "$PLATFORM_JAR" ]; then
+    echo "ERROR: PLATFORM_API=$PLATFORM_API was asked for but $PLATFORM_JAR is missing"
+    echo "       usable platforms here: $(with_jar | sort -n | tr '\n' ' ')"
+    echo "       install it with: sdkmanager \"platforms;android-$PLATFORM_API\""
+    exit 1
+  fi
+else
+  PLATFORM_API="$(with_jar | sort -n | tail -1)"
+  if [ -z "$PLATFORM_API" ]; then
+    echo "ERROR: no platform with an android.jar under $SDK/platforms"
+    echo "       install one with: sdkmanager \"platforms;android-34\""
+    exit 1
+  fi
+  PLATFORM_JAR="$SDK/platforms/android-$PLATFORM_API/android.jar"
+fi
 
 find_jdk() {
   for c in "${JAVA_HOME:-}" /usr/lib/jvm/* /opt/java/* /opt/jdk/*; do

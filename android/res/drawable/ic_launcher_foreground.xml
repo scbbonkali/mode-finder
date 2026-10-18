@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher icon: six strings with two marked notes. A green scale note filled
+  with the app's accent green low on the neck, and an outlined root in the warm
+  hue below it: the app's own language for a scale note against a root.
+
+  Geometry is deliberate: adaptive icons are masked, and only the central 66dp
+  circle of the 108dp canvas is guaranteed visible. This motif spans x 34..74,
+  y 32.4..75.6, so even its corners sit sqrt(20^2 + 21.6^2) = 29.4 from the
+  centre, safely inside the 33 radius.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="108dp" android:height="108dp"
+        android:viewportWidth="108" android:viewportHeight="108">
+
+  <!-- six strings: y centres 34,42,50,58,66,74; 3.2 thick, x 34..74 -->
+  <path android:fillColor="@color/icon_string"
+        android:pathData="M34,32.4h40v3.2h-40z M34,40.4h40v3.2h-40z M34,48.4h40v3.2h-40z
+                          M34,56.4h40v3.2h-40z M34,64.4h40v3.2h-40z M34,72.4h40v3.2h-40z" />
+
+  <!-- a scale note sitting on the third string -->
+  <path android:fillColor="@color/icon_scale_dot"
+        android:pathData="M44,45.5a4.5,4.5 0 1,0 0,9a4.5,4.5 0 1,0 0,-9z" />
+
+  <!-- and a root, outlined, on the fourth -->
+  <path android:fillColor="#00000000"
+        android:strokeColor="@color/icon_root_ring"
+        android:strokeWidth="2.4"
+        android:pathData="M66,53a5,5 0 1,0 0,10a5,5 0 1,0 0,-10z" />
+</vector>

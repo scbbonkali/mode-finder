@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f1113">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mode Finder</title>
+<style>
+  :root{
+    color-scheme:dark;            /* tell the browser we ARE dark: this
+                                     stands down auto-dark, which was
+                                     lifting the near-black ghost notes
+                                     to white on the phone            */
+    --bg:#0f1113; --panel:#171b1f; --panel2:#1e242a; --line:#2b3238;
+    --fg:#e8eaed; --muted:#98a2ac; --accent:#34d399; --half:#fb923c;
+    /* --accent walked toward yellow: hue 158deg -> 90deg, but the same
+       64% saturation and 52% lightness, so it is no brighter and no
+       weaker -- only yellower. Borders of the chord tones only: a
+       yellow-green outline now sits on a green fill, so the root and the
+       3rd/5th separate from a plain scale tone by HUE as well as by
+       brightness. Still a light colour at low alpha, which is the one
+       family the phone's force-dark never repaints. */
+    --warm66:hsl(90 64% 52% / .66);    /* root outline      */
+    --warm60:hsl(90 64% 52% / .60);    /* 3rd and 5th       */
+    /* single source of truth for scale highlights */
+    --hit-bg:rgba(52,211,153,.15); --hit-bd:rgba(52,211,153,.32);
+    --deg-bg:rgba(52,211,153,.23); --deg-bd:var(--warm60);
+    --root-bg:rgba(52,211,153,.28); --root-bd:var(--warm66);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    overscroll-behavior-y:contain}
+  body{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+
+  /* ---- app bar ---- */
+  .bar{
+    position:sticky;top:0;z-index:10;
+    padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+    background:rgba(15,17,19,.86);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .brand{margin:0;background:none;border:0;padding:0;color:var(--fg);
+    position:relative;
+    font-family:inherit;font-size:16px;font-weight:650;letter-spacing:.2px;
+    display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+  .brand::after{content:"";position:absolute;inset:-11px -12px}
+  .brand .car{font-size:10px;color:var(--muted)}
+  .menu{position:absolute;top:calc(100% - 2px);left:16px;min-width:196px;
+    padding:6px;border-radius:14px;background:rgba(23,27,31,.97);
+    border:1px solid var(--line);box-shadow:0 14px 30px rgba(0,0,0,.5);
+    display:flex;flex-direction:column;gap:2px}
+  .menu[hidden]{display:none}
+  .menu button{appearance:none;background:none;border:0;border-radius:10px;
+    padding:10px 12px;color:var(--fg);font-family:inherit;font-size:14px;
+    font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer}
+  .menu button .tick{width:14px;opacity:0;color:var(--accent)}
+  .menu button.on{color:var(--accent)}
+  .menu button.on .tick{opacity:1}
+  .seg{margin-left:auto;display:inline-flex;background:var(--panel2);
+    border:1px solid var(--line);border-radius:999px;padding:2px}
+  .seg button{background:none;border:0;color:var(--muted);font-family:inherit;
+    font-size:12px;font-weight:700;padding:6px 11px;border-radius:999px;min-width:34px}
+  /* Selected option: tinted dark pill with green text, NOT green with
+     near-black text -- force-dark lifts any dark text to white, which
+     would leave white-on-green at 1.7:1. A light accent colour on a
+     dark tint is left alone, and matches the note pills below. */
+  .seg button.on{background:rgba(52,211,153,.16);color:var(--accent);
+    box-shadow:inset 0 0 0 1px var(--accent)}
+
+  /* ---- scrolling pickers -------------------------------------------
+     A rail that snaps. The item parked under the centre band IS the
+     selection, so nothing can ever hide off the edge of the screen.   */
+  .selectors{padding:8px 16px 0}
+  .prow{display:flex;align-items:center;gap:8px}
+  .prow+.prow{margin-top:2px}
+  .plabel{flex:0 0 auto;width:46px;font-size:10px;letter-spacing:.9px;
+    text-transform:uppercase;color:var(--muted);font-weight:700}
+
+  .picker{position:relative;flex:1 1 auto;min-width:0;height:56px}
+  .band{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:calc(var(--item-w) + 12px);height:48px;border-radius:13px;
+    border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.07);
+    pointer-events:none}
+  .strip{display:flex;height:100%;overflow-x:auto;overflow-y:hidden;
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+    padding-inline:max(0px,calc(50% - var(--item-w)/2));
+    scrollbar-width:none;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 64px,#000 calc(100% - 64px),transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 64px,#000 calc(100% - 64px),transparent)}
+  .strip::-webkit-scrollbar{display:none}
+  .st-roots{--item-w:64px}
+  .st-modes{--item-w:154px}
+  .chip{flex:0 0 var(--item-w);width:var(--item-w);height:100%;border:0;
+    background:none;padding:0;color:var(--muted);font-family:inherit;
+    font-size:15px;font-weight:600;white-space:nowrap;
+    display:inline-flex;align-items:center;justify-content:center;
+    scroll-snap-align:center}
+  .chip.on{color:var(--accent);font-weight:700}
+
+  /* ---- cards ---- */
+  .card{margin:14px 16px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:22px;font-weight:700;letter-spacing:.3px}
+  .card h2 .mode{color:var(--accent)}
+  .notes{display:flex;flex-wrap:wrap;gap:6px}
+  .note{padding:4px 10px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line);font-size:13px;font-weight:600}
+  .note.hit{background:var(--hit-bg);border-color:var(--hit-bd);color:var(--accent)}
+  .note.deg{background:var(--deg-bg);border-color:var(--deg-bd);color:var(--accent)}
+  .note.root{background:var(--root-bg);border-color:var(--root-bd);color:var(--accent);
+    font-weight:700}
+  /* the two degrees the variant drops: readable, but dimmer than a real
+     note and struck out. Same recipe as the neck's td.gap on purpose, so
+     the hole looks like the same thing wherever it is shown. Both are
+     light-at-low-alpha: the phone's force-dark leaves them alone. */
+  .note.gap{background:var(--panel);border-color:#20262b;color:rgba(232,234,237,.26);
+    text-decoration:line-through;text-decoration-color:rgba(232,234,237,.30)}
+  .meta{display:flex;flex-wrap:wrap;align-items:center;gap:7px 9px;margin-top:13px;
+    padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .meta b{color:var(--fg);font-weight:600}
+  .meta .sep{width:3px;height:3px;border-radius:50%;background:#414c55;flex:0 0 auto}
+  .steps{font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--fg)}
+  .steps .h{color:var(--half)}
+
+  /* ---- fretboard ---- */
+  .fbcard{margin:14px 0 0;border-radius:16px 16px 0 0;border-left:0;border-right:0;
+    border-bottom:0;padding:16px 0 6px}
+  .fbtitle{position:relative;padding:0 16px 12px;font-size:11px;letter-spacing:.9px;
+    text-transform:uppercase;color:var(--muted);font-weight:600;
+    display:flex;align-items:center;justify-content:space-between;gap:8px}
+  /* the variant control: one more word in the header row, nothing more.
+     Same 11px, same line box, no new padding -- so the row's height is
+     unchanged. The thumb target is grown underneath with ::after, exactly
+     the trick the title uses. */
+  .vbtn{position:relative;appearance:none;background:none;border:0;padding:0;margin:0;
+    font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--muted);
+    display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+  .vbtn::after{content:"";position:absolute;inset:-9px -12px}
+  .vbtn .car{font-size:10px;opacity:.85}
+  .vbtn.has{color:var(--accent)}          /* a five-note scale lives in here */
+  .vbtn.on{color:var(--accent);font-weight:700}
+  /* the dropdown reuses .menu's look. It is anchored to the header row, and
+     needs a z-index: the sticky fret numbers come later in the DOM and would
+     otherwise paint over it. */
+  .vmenu{top:calc(100% - 2px);left:auto;right:16px;z-index:3;
+    min-width:196px;max-width:268px;text-transform:none;letter-spacing:0}
+  /* A button carries text-align:center from the browser's own stylesheet.
+     With one line per row that is invisible -- but the recipe line under the
+     name is a block, so a short one would sit centred. Both lines flush left. */
+  .vmenu button{align-items:flex-start;text-align:left}
+  .vmenu .tick{padding-top:1px}
+  .vmenu i{display:block;font-style:normal;font-weight:500;font-size:11px;
+    color:var(--muted);margin-top:2px}
+  .vnote{padding:9px 12px;font-size:12px;line-height:1.4;font-weight:500;color:var(--muted)}
+  .vnote b{display:block;margin-bottom:3px;color:var(--fg);font-weight:600}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+    padding:0 16px}
+  .scroll::-webkit-scrollbar{display:none}
+  table.fb{--cell:38px;
+    border-collapse:separate;border-spacing:0;margin:0 auto;table-layout:fixed;
+    width:calc(var(--cell)*var(--frets))}
+  table.fb th,table.fb td{padding:0;text-align:center;font-weight:600}
+  table.fb thead th{position:sticky;top:0;height:20px;font-size:10px;color:var(--muted);
+    background:var(--panel)}
+  /* 16px, not 12: a double marker's ink is 13px tall -- a 5px dot with a 4px
+     ring above and below -- so a 12px band left the bottom dot hanging into the
+     first note row, and 14px still left it a single device pixel from that
+     note's highlight border (measured), which reads as a clipped dot. At 16px
+     the ink ends 1.5px above the note row: ~4.5 device px of clear air at 3x. */
+  table.fb tr.mk td{height:16px}
+  table.fb tbody th,table.fb tbody td{width:var(--cell);height:28px;
+    font-size:calc(var(--cell)*0.28);background:var(--panel2);border:1px solid var(--line);
+    white-space:nowrap}
+  /* Notes outside the mode: ghosted into the background.
+     Written as a LIGHT colour at low alpha, never as dark-on-dark text.
+     Phone browsers that force-dark a page lift any near-black text to
+     white (they assume you can't read it) -- but they never touch an
+     already-light colour, and never touch alpha. So this stays the same
+     near-black on every device, dark or force-dark. */
+  table.fb tbody td.off{background:var(--panel);border-color:#20262b;
+    color:rgba(232,234,237,.10)}
+  /* A note the variant DROPS. It belongs to the parent, so it must not read
+     as a note outside the parent: same dark hole, but the letter is kept a
+     shade brighter and struck through. Light colour at low alpha again --
+     the one family the phone's force-dark never repaints. */
+  table.fb tbody td.gap{background:var(--panel);border-color:#20262b;
+    color:rgba(232,234,237,.26);
+    text-decoration:line-through;text-decoration-color:rgba(232,234,237,.30);
+    text-decoration-thickness:1px}
+  /* No string-name column. It was sticky at left:0, which pinned it to the
+     INSIDE of the 16px gutter -- so scrolled fretboard slid visibly through
+     that gutter to its left. Cutting it leaves one uninterrupted surface. */
+  table.fb thead th.f{width:var(--cell);border:0}
+  table.fb td.hit{background:var(--hit-bg);color:var(--accent);
+    border-color:var(--hit-bd)}
+  /* the 3rd and 5th degrees: the two notes that name the mode */
+  table.fb td.deg{background:var(--deg-bg);color:var(--accent);
+    border-color:var(--deg-bd)}
+  /* the root: brightest of the four, one soft ring */
+  table.fb td.root{background:var(--root-bg);color:var(--accent);
+    border-color:var(--root-bd);font-weight:700}
+  .dot{display:block;width:5px;height:5px;border-radius:50%;background:var(--muted);
+    margin:0 auto;opacity:.6}
+  .dot.double{position:relative;background:none}
+  .dot.double:before,.dot.double:after{content:"";position:absolute;left:50%;
+    width:5px;height:5px;border-radius:50%;background:var(--muted);opacity:.6;
+    transform:translateX(-50%)}
+  .dot.double:before{top:-4px}
+  .dot.double:after{bottom:-4px}
+  .legend{display:flex;gap:16px;justify-content:center;padding:14px 16px 8px;
+    font-size:11px;color:var(--muted)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;
+    margin-right:6px;vertical-align:-1px}
+  .legend .r{background:var(--root-bg);box-shadow:inset 0 0 0 1px var(--root-bd)}
+  .legend .d{background:var(--deg-bg);box-shadow:inset 0 0 0 1px var(--deg-bd)}
+  .legend .s{background:var(--hit-bg);border:1px solid var(--hit-bd)}
+
+  /* ---- wide screens: pickers left, info panel to their right ---- */
+  @media (min-width:760px){
+    .layout{display:grid;grid-template-columns:minmax(320px,1fr) 360px;
+      gap:0 20px;padding:0 20px;align-items:start}
+    .bar{padding-left:20px;padding-right:20px}
+    .selectors{padding:8px 0 0}
+    .layout #info{margin:8px 0 0}
+    .fbcard{margin:16px 20px 0;border:1px solid var(--line);border-radius:16px}
+    .scroll{padding:0 20px}
+  }
+  /* Roomier neck once there is real screen space -- but never wider than the
+     card, so a full 24-fret neck still fits without scrolling. */
+  @media (min-width:900px){
+    table.fb{--cell:clamp(30px,calc((100vw - 88px)/var(--frets)),52px)}
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <button class="brand" id="brand" aria-haspopup="true" aria-expanded="false"
+          aria-controls="menu">Mode Finder<span class="car">&#9662;</span></button>
+  <div class="seg" id="seg">
+    <button data-p="auto">Auto</button>
+    <button data-p="sharp">&#9839;</button>
+    <button data-p="flat">&#9837;</button>
+  </div>
+  <div class="menu" id="menu" role="menu" hidden></div>
+</header>
+
+<main>
+  <div class="layout">
+    <div class="selectors">
+      <div class="prow">
+        <span class="plabel">Root</span>
+        <div class="picker st-roots">
+          <div class="band"></div>
+          <div class="strip" id="roots" aria-label="Root note"></div>
+        </div>
+      </div>
+
+      <div class="prow">
+        <span class="plabel">Mode</span>
+        <div class="picker st-modes">
+          <div class="band"></div>
+          <div class="strip" id="modes" aria-label="Mode"></div>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" id="info"></section>
+  </div>
+
+  <section class="card fbcard">
+    <div class="fbtitle">
+      <span>Fretboard</span>
+      <button class="vbtn" id="vbtn" aria-haspopup="true" aria-expanded="false"
+              aria-controls="vmenu">Variant<span class="car">&#9662;</span></button>
+      <div class="menu vmenu" id="vmenu" role="menu" hidden></div>
+    </div>
+    <div class="scroll" id="fb"></div>
+    <div class="legend">
+      <span><i class="r"></i>Root</span>
+      <span><i class="d"></i>3rd &amp; 5th</span>
+      <span><i class="s"></i>Scale tone</span>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------
+   SPELLING ENGINE
+   A seven-note scale uses each letter name A-G exactly once, in order.
+   So we never "pick" accidentals: we walk the letters and work out how
+   far each one must be raised or lowered to reach the right pitch.
+   When a root has two spellings (D# or Eb), we try both and keep the
+   one needing the fewest accidentals. That is the whole rule.
+------------------------------------------------------------------ */
+const LETTERS=["C","D","E","F","G","A","B"];
+const LETTER_PC=[0,2,4,5,7,9,11];              // natural pitch class per letter
+
+// the two fixed spellings, indexed by pitch class, as [letterIndex, accidental]
+const SHARP_TAB=[[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
+const FLAT_TAB =[[0,0],[1,-1],[1,0],[2,-1],[2,0],[3,0],[4,-1],[4,0],[5,-1],[5,0],[6,-1],[6,0]];
+// what musicians conventionally reach for on a true tie (F# major, Bb major...)
+const CONVENTIONAL=pc=>[1,6].includes(pc)?"sharp":[3,8,10].includes(pc)?"flat":"natural";
+
+const accStr=a=>a>0?"\u266F".repeat(a):a<0?"\u266D".repeat(-a):"";
+const nameOf=n=>LETTERS[n.letter]+accStr(n.acc);
+const pcOf  =n=>(LETTER_PC[n.letter]+n.acc+120)%12;
+
+/* three families of modes: major, melodic minor, harmonic minor. a mode is
+   just a rotation of its parent scale, so the step patterns, the parent
+   degrees and the tonic-triad quality are all computed, never typed. */
+const degOf =steps=>{let s=0;return steps.map(x=>{const d=s;s=(s+x)%12;return d;})};
+const triadQ=steps=>{
+  const third=steps[0]+steps[1], fifth=third+steps[2]+steps[3];
+  return third===4?(fifth===8?"Augmented":"Major")
+       :third===3?(fifth===6?"Diminished":"Minor"):"?"};
+const FAMILIES=[
+  {label:"Major",         word:"major",         parent:[2,2,1,2,2,2,1],
+   names:["Ionian","Dorian","Phrygian","Lydian","Mixolydian","Aeolian","Locrian"]},
+  {label:"Melodic minor", word:"melodic minor", parent:[2,1,2,2,2,2,1],
+   names:["Melodic minor","Dorian \u266D2","Lydian augmented","Lydian dominant",
+          "Mixolydian \u266D6","Locrian \u266E2","Altered"]},
+  {label:"Harmonic minor",word:"harmonic minor",parent:[2,1,2,2,1,3,1],
+   names:["Harmonic minor","Locrian \u266E6","Ionian \u266F5","Dorian \u266F4",
+          "Phrygian dominant","Lydian \u266F2","Ultralocrian"]}
+].map(f=>{
+  const rot=i=>[...f.parent.slice(i),...f.parent.slice(0,i)];
+  return {...f,modes:f.names.map((name,i)=>{const steps=rot(i);
+    return {name,steps,q:triadQ(steps)}})};
+});
+let fam=0, MODES=FAMILIES[0].modes, MAJ=degOf(FAMILIES[0].parent);
+function setFamily(i){ fam=i; MODES=FAMILIES[i].modes; MAJ=degOf(FAMILIES[i].parent); }
+const STRINGS=[4,9,2,7,11,4];                  // low E A D G B high E
+const FRETS=25;                                // frets 0..24: two full octaves
+const MARKERS=[3,5,7,9,15,17,19,21];           // singles; doubles at 12 and 24 are drawn below
+
+// walk the letters from a given tonic, returning {letter,acc} for all 7 degrees
+function spellFrom(letter,acc,steps){
+  const out=[{letter,acc}];
+  let pc=(LETTER_PC[letter]+acc+120)%12;
+  for(let i=0;i<6;i++){
+    pc=(pc+steps[i])%12;
+    const li=(letter+i+1)%7;
+    let a=((pc-LETTER_PC[li])%12+12)%12;
+    if(a>6)a-=12;                              // keep the accidental nearest zero
+    out.push({letter:li,acc:a});
+  }
+  return out;
+}
+
+// every sane spelling of a pitch class (never more than a double accidental)
+function rootsFor(pc){
+  const out=[];
+  for(let li=0;li<7;li++){
+    let a=((pc-LETTER_PC[li])%12+12)%12;
+    if(a>6)a-=12;
+    if(Math.abs(a)<=2)out.push({letter:li,acc:a});
+  }
+  return out;
+}
+
+// spell a mode for a pitch class, choosing the least-accidental spelling
+function spellMode(pc,mi,pref){
+  let cands;
+  if(pref==="sharp")      cands=[{letter:SHARP_TAB[pc][0],acc:SHARP_TAB[pc][1]}];
+  else if(pref==="flat")  cands=[{letter:FLAT_TAB[pc][0], acc:FLAT_TAB[pc][1]}];
+  else                    cands=rootsFor(pc);
+
+  const rank=[];
+  for(const c of cands){
+    const notes=spellFrom(c.letter,c.acc,MODES[mi].steps);
+    const cost=notes.reduce((s,n)=>s+Math.abs(n.acc),0);
+    const doubles=notes.filter(n=>Math.abs(n.acc)>1).length;
+    const conv=CONVENTIONAL(pc);
+    const offConvention=(conv==="sharp"&&c.acc>0)||(conv==="flat"&&c.acc<0)||
+                        (conv==="natural"&&c.acc===0)?0:1;
+    rank.push({notes,root:c,cost,doubles,offConvention});
+  }
+  rank.sort((a,b)=>a.cost-b.cost   || a.doubles-b.doubles ||
+                   a.offConvention-b.offConvention ||
+                   Math.abs(a.root.acc)-Math.abs(b.root.acc));
+  const best=rank[0];
+  const parentPc=(pc-MAJ[mi]+12)%12;                      // the parent scale it borrows
+  const j=best.notes.findIndex(n=>pcOf(n)===parentPc);
+  best.parentName=nameOf(best.notes[j]);
+  best.names=best.notes.map(nameOf);
+  best.rootName=nameOf(best.root);
+  return best;
+}
+
+/* ------------------------------------------------------------------ */
+const rootsEl=document.getElementById("roots");
+const modesEl=document.getElementById("modes");
+const infoEl =document.getElementById("info");
+const fbEl   =document.getElementById("fb");
+const segEl  =document.getElementById("seg");
+
+let sel={root:9,mi:5};        // A Aeolian -- the classic one
+let pref="auto";              // auto | sharp | flat
+let shown=null;               // the scale currently on screen
+let rootSig=null;             // label signature of the root rail
+
+const SETTLE=90;              // ms of quiet before a swipe is committed
+
+function renderSeg(){
+  [...segEl.children].forEach(b=>b.classList.toggle("on",b.dataset.p===pref));
+}
+
+/* ---- the rails --------------------------------------------------- */
+const rootLabels=()=>Array.from({length:12},(_,pc)=>spellMode(pc,sel.mi,pref).rootName);
+
+function buildRoots(){
+  const L=rootLabels();
+  rootSig=L.join("|");
+  rootsEl.innerHTML=L.map((n,pc)=>
+    `<button class="chip${pc===sel.root?" on":""}" data-r="${pc}">${n}</button>`).join("");
+}
+function buildModes(){
+  modesEl.innerHTML=MODES.map((m,i)=>
+    `<button class="chip${i===sel.mi?" on":""}" data-m="${i}">${m.name}</button>`).join("");
+}
+function markSel(){
+  [...rootsEl.children].forEach((b,i)=>b.classList.toggle("on",i===sel.root));
+  [...modesEl.children].forEach((b,i)=>b.classList.toggle("on",i===sel.mi));
+}
+
+// slide a rail until item i sits under the centre band
+function center(el,i,smooth){
+  const c=el.children[i]; if(!c) return;
+  const x=Math.max(0,c.offsetLeft-(el.clientWidth-c.offsetWidth)/2);
+  el.scrollTo({left:x,behavior:smooth?"smooth":"auto"});
+}
+// which item is parked under the centre band right now
+function centered(el){
+  const cx=el.scrollLeft+el.clientWidth/2;
+  let best=0,bd=Infinity;
+  [...el.children].forEach((c,i)=>{
+    const d=Math.abs(c.offsetLeft+c.offsetWidth/2-cx);
+    if(d<bd){bd=d;best=i;}
+  });
+  return best;
+}
+
+/* ---- the cards --------------------------------------------------- */
+function renderInfo(){
+  const s=spellMode(sel.root,sel.mi,pref);
+  const drop=new Set(variant?variant.drop:[]);
+  const steps=MODES[sel.mi].steps
+    .map(x=>x===2?"W":x===3?`<span class="h">WH</span>`
+                            :`<span class="h">H</span>`).join(" ");
+  infoEl.innerHTML=
+    `<h2>${s.rootName} <span class="mode">${MODES[sel.mi].name}</span></h2>
+     <div class="notes">${s.names.map((n,i)=>
+       `<span class="note ${drop.has(i)?"gap":i===0?"root"
+                             :(i===2||i===4)?"deg":"hit"}">${n}</span>`).join("")}</div>
+     <div class="meta">
+       <span class="steps">${steps}</span>
+       <span class="sep"></span>
+       <span>${MODES[sel.mi].q}</span>
+       <span class="sep"></span>
+       <span>parent <b>${s.parentName} ${FAMILIES[fam].word}</b></span>
+     </div>`;
+  return s;
+}
+
+function renderFb(s){
+  const rootPc=sel.root;
+  /* the two degrees the variant drops keep their place in the parent but
+     lose their colour: they are neither scale tones nor roots nor chord
+     tones, so they fall into their own .gap state. */
+  const drop=new Set(variant?variant.drop:[]);
+  const kept=s.notes.map((n,i)=>i).filter(i=>!drop.has(i));
+  // pitch-class -> display name for every cell, spelled the way the scale
+  // on screen spells it
+  const names={};
+  s.notes.forEach(n=>{const pc=pcOf(n);if(!(pc in names))names[pc]=nameOf(n);});
+  const sharps=s.notes.reduce((k,n)=>k+(n.acc>0?1:0),0);
+  const flats =s.notes.reduce((k,n)=>k+(n.acc<0?1:0),0);
+  const tab=(pref==="flat"||(pref==="auto"&&flats>sharps))?FLAT_TAB:SHARP_TAB;
+  for(let pc=0;pc<12;pc++) if(!(pc in names))
+    names[pc]=nameOf({letter:tab[pc][0],acc:tab[pc][1]});
+  const set=new Set(kept.map(i=>pcOf(s.notes[i])));
+  const gapPcs=new Set(drop.size?[...drop].map(i=>pcOf(s.notes[i])):[]);
+  // the 3rd and the 5th sit under the root: together they are the chord
+  // that names the mode (minor 3rd = minor sound, flat 5th = diminished).
+  // If the variant has dropped one of them, it must not keep its ring.
+  const degPcs=new Set([2,4].filter(i=>!drop.has(i)).map(i=>pcOf(s.notes[i])));
+  let h=`<table class="fb" style="--frets:${FRETS}"><thead>
+    <tr>${Array.from({length:FRETS},(_,f)=>
+      `<th class="f">${f}</th>`).join("")}</tr>
+    <tr class="mk">${Array.from({length:FRETS},(_,f)=>
+      `<td>${f===12||f===24?'<span class="dot double"></span>'
+                  :MARKERS.includes(f)?'<span class="dot"></span>':""}</td>`).join("")}</tr>
+    </thead><tbody>`;
+  for(let si=STRINGS.length-1;si>=0;si--){
+    h+=`<tr>`;
+    for(let f=0;f<FRETS;f++){
+      const pc=(STRINGS[si]+f)%12;
+      const c=pc===rootPc?"root"
+             :degPcs.has(pc)?"deg"
+             :set.has(pc)?"hit"
+             :gapPcs.has(pc)?"gap":"off";
+      h+=`<td class="${c}">${names[pc]}</td>`;
+    }
+    h+="</tr>";
+  }
+  fbEl.innerHTML=h+"</tbody></table>";
+}
+
+/* ---- one repaint: rails kept in place, cards rebuilt -------------- */
+function render(){
+  const sig=rootLabels().join("|");
+  if(sig!==rootSig){ buildRoots(); center(rootsEl,sel.root,false); }
+  renderSeg();
+  markSel();
+  refreshVariant();
+  shown=renderInfo();
+  renderFb(shown);
+}
+
+/* ---- input -------------------------------------------------------- */
+// a swipe settles on an item; that item becomes the selection.
+// scrollend is exact (it fires after the snap animation, not during),
+// the timer is the fallback for browsers without it.
+function watch(el,commit){
+  let t=null;
+  const settle=()=>{ clearTimeout(t); if(commit(centered(el))) render(); };
+  el.addEventListener("scroll",()=>{ clearTimeout(t); t=setTimeout(settle,SETTLE); },{passive:true});
+  el.addEventListener("scrollend",settle);
+}
+watch(rootsEl,i=>{ if(i===sel.root) return false; sel.root=i; return true; });
+watch(modesEl,i=>{ if(i===sel.mi)   return false; sel.mi=i;   return true; });
+
+// a tap jumps that item to the middle
+function onPick(e){
+  const b=e.target.closest("button"); if(!b) return;
+  const el=e.currentTarget;
+  if(el===rootsEl){ sel.root=+b.dataset.r; center(el,sel.root,true); }
+  else            { sel.mi  =+b.dataset.m; center(el,sel.mi,true); }
+  render();
+}
+rootsEl.addEventListener("click",onPick);
+modesEl.addEventListener("click",onPick);
+
+segEl.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-p]"); if(!b) return;
+  pref=b.dataset.p; render();
+});
+
+/* ---- family menu: the title swaps major / melodic / harmonic ------- */
+const brandEl=document.getElementById("brand"), menuEl=document.getElementById("menu");
+function buildMenu(){
+  menuEl.innerHTML=FAMILIES.map((f,i)=>
+    `<button role="menuitem" data-f="${i}"${i===fam?' class="on"':""}>`+
+    `<span class="tick">&#10003;</span>${f.label} modes</button>`).join("");
+}
+const openMenu=o=>{ menuEl.hidden=!o;
+  brandEl.setAttribute("aria-expanded",o?"true":"false"); };
+brandEl.addEventListener("click",e=>{ e.stopPropagation(); openVMenu(false);
+  openMenu(menuEl.hidden); });
+document.addEventListener("click",e=>{
+  if(!menuEl.hidden && !e.target.closest("#menu")) openMenu(false);
+  if(!vmenuEl.hidden && !e.target.closest("#vmenu")) openVMenu(false);
+});
+menuEl.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-f]"); if(!b) return;
+  openMenu(false);
+  const i=+b.dataset.f; if(i===fam) return;
+  setFamily(i); sel.mi=0;                 // new family: start on its home scale
+  buildModes(); buildMenu(); center(modesEl,0,false); render();
+});
+
+/* ---- variants: the mode with two of its seven notes dropped ----------
+   We never type a menu. We try all fifteen pairs of droppable degrees and
+   keep the ones whose five remaining notes spell a scale with a name. So
+   the menu can only ever list things that are really in there.
+   Note what that means: the recipe (drop the 4th and the b7th) shows a
+   DIFFERENT name in every mode -- Hirajoshi on Aeolian, Kumoi on Dorian --
+   because a mode's other notes are what fill the shape in. ------------ */
+const SHAPE_NAME={
+  "0,2,4,7,9":"Major pentatonic",  "0,3,5,7,10":"Minor pentatonic",
+  "0,2,5,7,9":"Ritusen",           "0,2,3,7,8":"Hirajoshi",
+  "0,2,3,7,9":"Kumoi",             "0,1,5,6,10":"Iwato",
+  "0,1,5,7,8":"In (Miyako-bushi)", "0,2,5,7,10":"Egyptian",
+  "0,3,5,8,10":"Man Gong",         "0,4,5,7,11":"Ryukyu",
+  "0,2,4,6,9":"Lydian pentatonic", "0,2,4,7,10":"Mixolydian pentatonic",
+  "0,1,5,7,10":"In-sen"
+};
+const RECIPES=[];                      // every pair of degrees the root may lose
+for(let a=1;a<7;a++)for(let b=a+1;b<7;b++)RECIPES.push([a,b]);
+const MAJOR_DEG=[0,2,4,5,7,9,11];      // the plain major scale, for naming degrees
+/* Menu order. The two pentatonics everyone reaches for go first, then the
+   ones a guitarist is most likely to have met. Anything unnamed sorts last. */
+const POPULAR=["Minor pentatonic","Major pentatonic","Hirajoshi","Egyptian","Kumoi",
+  "Iwato","In (Miyako-bushi)","In-sen","Man Gong","Ritusen","Ryukyu",
+  "Lydian pentatonic","Mixolydian pentatonic"];
+const popRank=n=>{const i=POPULAR.indexOf(n);return i<0?999:i;};
+
+let variant=null;                      // {name,drop} currently on screen
+let VARIANTS=[];                       // what exists inside the mode on screen
+
+function variantsFor(mi){
+  const d=degOf(MODES[mi].steps),out=[];
+  for(const drop of RECIPES){
+    const key=[0,1,2,3,4,5,6].filter(i=>drop.indexOf(i)<0)
+      .map(i=>d[i]).sort((a,b)=>a-b).join(",");
+    if(SHAPE_NAME[key])out.push({name:SHAPE_NAME[key],drop});
+  }
+  out.sort((a,b)=>popRank(a.name)-popRank(b.name));   // the familiar ones first
+  return out;
+}
+// "4", "b7"... written the way THIS mode spells it, so Lydian drops a #4.
+// Accidental first, the way the mode names are written: "Dorian b2".
+function degLabel(mi,i){
+  const d=degOf(MODES[mi].steps);
+  return `${accStr(d[i]-MAJOR_DEG[i])}${i+1}`;
+}
+const dropWords=(mi,drop)=>"no "+drop.map(i=>degLabel(mi,i)).join(", no ");
+
+const vbtnEl=document.getElementById("vbtn"),vmenuEl=document.getElementById("vmenu");
+
+function buildVMenu(){
+  const on=!!variant;
+  vbtnEl.className="vbtn"+(VARIANTS.length||on?" has":"")+(on?" on":"");
+  vbtnEl.innerHTML=(on?variant.name:"Variant")+'<span class="car">\u25BE</span>';
+  if(!VARIANTS.length){
+    vmenuEl.innerHTML=`<div class="vnote"><b>No variant here</b>`+
+      `A variant is this mode with two of its seven notes dropped. Every pair `+
+      `you could drop from this mode leaves a five-note scale with no name.</div>`;
+    return;
+  }
+  let h="";
+  if(on)h+=`<button role="menuitem" data-v="-1"><span class="tick">\u2713</span>None</button>`;
+  h+=VARIANTS.map((v,i)=>
+    `<button role="menuitem" data-v="${i}"`+
+    `${on&&v.drop.join()===variant.drop.join()?' class="on"':""}>`+
+    `<span class="tick">\u2713</span><span>${v.name}`+
+    `<i>${dropWords(sel.mi,v.drop)}</i></span></button>`).join("");
+  h+=`<div class="vnote">This mode with two of its seven notes dropped.</div>`;
+  vmenuEl.innerHTML=h;
+}
+function refreshVariant(){
+  VARIANTS=variantsFor(sel.mi);
+  if(variant){                          // the recipe follows the mode if it still lands
+    variant=VARIANTS.find(v=>v.drop.join()===variant.drop.join())||null;
+  }
+  buildVMenu();
+}
+const openVMenu=o=>{ vmenuEl.hidden=!o;
+  vbtnEl.setAttribute("aria-expanded",o?"true":"false"); if(o)buildVMenu(); };
+vbtnEl.addEventListener("click",e=>{ e.stopPropagation(); openMenu(false);
+  openVMenu(vmenuEl.hidden); });
+vmenuEl.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-v]"); if(!b)return;
+  openVMenu(false);
+  const i=+b.dataset.v;
+  if(i<0)variant=null;
+  else{
+    const v=VARIANTS[i];
+    // tapping the live one again turns it off
+    variant=(variant&&variant.drop.join()===v.drop.join())?null:v;
+  }
+  render();
+});
+
+/* ---- start -------------------------------------------------------- */
+function place(){ center(rootsEl,sel.root,false); center(modesEl,sel.mi,false); }
+
+function init(){
+  buildMenu();
+  renderSeg();
+  buildModes();
+  buildRoots();
+  refreshVariant();
+  shown=renderInfo();
+  renderFb(shown);
+  requestAnimationFrame(place);
+  addEventListener("load",place);
+  let t=null;
+  addEventListener("resize",()=>{ clearTimeout(t); t=setTimeout(place,120); });
+}
+init();
+</script>
+</body>
+</html>

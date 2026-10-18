@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Straight from the page's own palette: its background, panel and muted
+     greys, its accent green, and the warm hsl(90 64% 52%) used for roots. -->
+<resources>
+  <color name="app_bg">#FF0F1113</color>
+  <color name="icon_bg">#FF171B1F</color>
+  <color name="icon_string">#FF8B95A0</color>
+  <color name="icon_scale_dot">#FF34D399</color>
+  <color name="icon_root_ring">#FF85D336</color>
+</resources>

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0f1113">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mode Finder</title>
+<style>
+  :root{
+    --bg:#0f1113; --panel:#171b1f; --panel2:#1e242a; --line:#2b3238;
+    --fg:#e8eaed; --muted:#98a2ac; --accent:#34d399; --half:#fb923c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    overscroll-behavior-y:contain}
+  body{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+
+  /* ---- app bar ---- */
+  .bar{
+    position:sticky;top:0;z-index:10;
+    padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+    background:rgba(15,17,19,.86);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .bar h1{margin:0;font-size:16px;font-weight:650;letter-spacing:.2px}
+  .seg{margin-left:auto;display:inline-flex;background:var(--panel2);
+    border:1px solid var(--line);border-radius:999px;padding:2px}
+  .seg button{background:none;border:0;color:var(--muted);font-family:inherit;
+    font-size:12px;font-weight:700;padding:6px 11px;border-radius:999px;min-width:34px}
+  .seg button.on{background:var(--accent);color:#04170f}
+
+  /* ---- selector strips ---- */
+  .label{font-size:11px;letter-spacing:.9px;text-transform:uppercase;
+    color:var(--muted);padding:14px 16px 7px;font-weight:600}
+  .strip{display:flex;gap:8px;overflow-x:auto;padding:0 16px 2px;
+    scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none}
+  .strip::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;min-width:46px;height:42px;padding:0 14px;
+    border-radius:999px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--fg);font-size:14px;font-weight:600;font-family:inherit;
+    display:inline-flex;align-items:center;justify-content:center;
+    scroll-snap-align:center;transition:background .12s,border-color .12s,color .12s}
+  .chip:active{transform:scale(.96)}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#04170f}
+  #modes .chip{min-width:0}
+
+  /* ---- cards ---- */
+  .card{margin:14px 16px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:22px;font-weight:700;letter-spacing:.3px}
+  .card h2 .mode{color:var(--accent)}
+  .notes{display:flex;flex-wrap:wrap;gap:6px}
+  .note{padding:4px 10px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line);font-size:13px;font-weight:600}
+  .note.hit{background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.30);color:var(--accent)}
+  .note.root{background:rgba(52,211,153,.30);border-color:var(--accent);color:var(--accent);
+    box-shadow:inset 0 0 0 1px var(--accent);font-weight:700}
+  .meta{display:flex;flex-wrap:wrap;align-items:center;gap:7px 9px;margin-top:13px;
+    padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .meta b{color:var(--fg);font-weight:600}
+  .meta .sep{width:3px;height:3px;border-radius:50%;background:#414c55;flex:0 0 auto}
+  .steps{font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--fg)}
+  .steps .h{color:var(--half)}
+
+  /* ---- fretboard ---- */
+  .fbcard{margin:14px 0 0;border-radius:16px 16px 0 0;border-left:0;border-right:0;
+    border-bottom:0;padding:16px 0 6px}
+  .fbtitle{padding:0 16px 12px;font-size:11px;letter-spacing:.9px;
+    text-transform:uppercase;color:var(--muted);font-weight:600}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+    padding:0 16px}
+  .scroll::-webkit-scrollbar{display:none}
+  table.fb{--cell:38px; --lbl:34px;
+    border-collapse:separate;border-spacing:0;margin:0 auto;table-layout:fixed;
+    width:calc(var(--lbl) + var(--cell)*var(--frets))}
+  table.fb th,table.fb td{padding:0;text-align:center;font-weight:600}
+  table.fb thead th{position:sticky;top:0;height:20px;font-size:10px;color:var(--muted);
+    background:var(--panel)}
+  table.fb tr.mk td{height:12px}
+  table.fb tbody th,table.fb tbody td{width:var(--cell);height:calc(var(--cell)*0.9);
+    font-size:calc(var(--cell)*0.28);background:var(--panel2);border:1px solid var(--line);
+    white-space:nowrap}
+  /* notes outside the mode: ghosted into the background */
+  table.fb tbody td.off{background:var(--panel);border-color:#20262b;color:#313a41}
+  table.fb tbody th.lbl{position:sticky;left:0;z-index:2;width:var(--lbl);
+    background:var(--panel);color:var(--muted);font-size:11px;
+    border-left:0;white-space:nowrap}
+  table.fb thead th.lbl{position:sticky;left:0;z-index:3;background:var(--panel);
+    border:0}
+  table.fb thead th.f{width:var(--cell);border:0}
+  table.fb td.hit{background:rgba(52,211,153,.14);color:var(--accent);
+    border-color:rgba(52,211,153,.30)}
+  table.fb td.root{background:rgba(52,211,153,.30);color:var(--accent);
+    border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:700}
+  .dot{display:block;width:5px;height:5px;border-radius:50%;background:var(--muted);
+    margin:0 auto;opacity:.6}
+  .dot.double{position:relative;background:none}
+  .dot.double:before,.dot.double:after{content:"";position:absolute;left:50%;
+    width:5px;height:5px;border-radius:50%;background:var(--muted);opacity:.6;
+    transform:translateX(-50%)}
+  .dot.double:before{top:-4px}
+  .dot.double:after{bottom:-4px}
+  .legend{display:flex;gap:16px;justify-content:center;padding:14px 16px 8px;
+    font-size:11px;color:var(--muted)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;
+    margin-right:6px;vertical-align:-1px}
+  .legend .r{background:rgba(52,211,153,.30);box-shadow:inset 0 0 0 2px var(--accent)}
+  .legend .s{background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.35)}
+
+  /* ---- wide screens: selectors left, info panel to their right ---- */
+  @media (min-width:760px){
+    .layout{display:grid;grid-template-columns:minmax(340px,1fr) 360px;
+      gap:0 20px;padding:0 20px;align-items:start}
+    .bar{padding-left:20px;padding-right:20px}
+    .picker .label{padding-left:0;padding-right:0}
+    .picker .strip{padding-left:0;padding-right:0}
+    .layout #info{margin:14px 0 0}
+    .fbcard{margin:16px 20px 0;border:1px solid var(--line);border-radius:16px}
+    .scroll{padding:0 20px}
+  }
+  /* roomier neck once there is real screen space */
+  @media (min-width:900px){
+    table.fb{--cell:52px;--lbl:38px}
+    table.fb tbody th.lbl{font-size:12px}
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>Mode Finder</h1>
+  <div class="seg" id="seg">
+    <button data-p="auto">Auto</button>
+    <button data-p="sharp">&#9839;</button>
+    <button data-p="flat">&#9837;</button>
+  </div>
+</header>
+
+<main>
+  <div class="layout">
+    <div class="picker">
+      <div class="label">Root</div>
+      <div class="strip" id="roots"></div>
+
+      <div class="label">Mode</div>
+      <div class="strip" id="modes"></div>
+    </div>
+
+    <section class="card" id="info"></section>
+  </div>
+
+  <section class="card fbcard">
+    <div class="fbtitle">Fretboard</div>
+    <div class="scroll" id="fb"></div>
+    <div class="legend">
+      <span><i class="r"></i>Root</span>
+      <span><i class="s"></i>Scale tone</span>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------
+   SPELLING ENGINE
+   A seven-note scale uses each letter name A-G exactly once, in order.
+   So we never "pick" accidentals: we walk the letters and work out how
+   far each one must be raised or lowered to reach the right pitch.
+   When a root has two spellings (D# or Eb), we try both and keep the
+   one needing the fewest accidentals. That is the whole rule.
+------------------------------------------------------------------ */
+const LETTERS=["C","D","E","F","G","A","B"];
+const LETTER_PC=[0,2,4,5,7,9,11];              // natural pitch class per letter
+
+// the two fixed spellings, indexed by pitch class, as [letterIndex, accidental]
+const SHARP_TAB=[[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
+const FLAT_TAB =[[0,0],[1,-1],[1,0],[2,-1],[2,0],[3,0],[4,-1],[4,0],[5,-1],[5,0],[6,-1],[6,0]];
+// what musicians conventionally reach for on a true tie (F# major, Bb major...)
+const CONVENTIONAL=pc=>[1,6].includes(pc)?"sharp":[3,8,10].includes(pc)?"flat":"natural";
+
+const accStr=a=>a>0?"\u266F".repeat(a):a<0?"\u266D".repeat(-a):"";
+const nameOf=n=>LETTERS[n.letter]+accStr(n.acc);
+const pcOf  =n=>(LETTER_PC[n.letter]+n.acc+120)%12;
+
+const MODES=[
+  {name:"Ionian",steps:[2,2,1,2,2,2,1],q:"Major"},
+  {name:"Dorian",steps:[2,1,2,2,2,1,2],q:"Minor"},
+  {name:"Phrygian",steps:[1,2,2,2,1,2,2],q:"Minor"},
+  {name:"Lydian",steps:[2,2,2,1,2,2,1],q:"Major"},
+  {name:"Mixolydian",steps:[2,2,1,2,2,1,2],q:"Major"},
+  {name:"Aeolian",steps:[2,1,2,2,1,2,2],q:"Minor"},
+  {name:"Locrian",steps:[1,2,2,1,2,2,2],q:"Diminished"}];
+const MAJ=[0,2,4,5,7,9,11];
+const STRINGS=[4,9,2,7,11,4];                  // low E A D G B high E
+const FRETS=13;                                // cell size lives in CSS: table.fb --cell
+const MARKERS=[3,5,7,9,15,17,19,21];
+
+// walk the letters from a given tonic, returning {letter,acc} for all 7 degrees
+function spellFrom(letter,acc,steps){
+  const out=[{letter,acc}];
+  let pc=(LETTER_PC[letter]+acc+120)%12;
+  for(let i=0;i<6;i++){
+    pc=(pc+steps[i])%12;
+    const li=(letter+i+1)%7;
+    let a=((pc-LETTER_PC[li])%12+12)%12;
+    if(a>6)a-=12;                              // keep the accidental nearest zero
+    out.push({letter:li,acc:a});
+  }
+  return out;
+}
+
+// every sane spelling of a pitch class (never more than a double accidental)
+function rootsFor(pc){
+  const out=[];
+  for(let li=0;li<7;li++){
+    let a=((pc-LETTER_PC[li])%12+12)%12;
+    if(a>6)a-=12;
+    if(Math.abs(a)<=2)out.push({letter:li,acc:a});
+  }
+  return out;
+}
+
+// spell a mode for a pitch class, choosing the least-accidental spelling
+function spellMode(pc,mi,pref){
+  let cands;
+  if(pref==="sharp")      cands=[{letter:SHARP_TAB[pc][0],acc:SHARP_TAB[pc][1]}];
+  else if(pref==="flat")  cands=[{letter:FLAT_TAB[pc][0], acc:FLAT_TAB[pc][1]}];
+  else                    cands=rootsFor(pc);
+
+  const rank=[];
+  for(const c of cands){
+    const notes=spellFrom(c.letter,c.acc,MODES[mi].steps);
+    const cost=notes.reduce((s,n)=>s+Math.abs(n.acc),0);
+    const doubles=notes.filter(n=>Math.abs(n.acc)>1).length;
+    const conv=CONVENTIONAL(pc);
+    const offConvention=(conv==="sharp"&&c.acc>0)||(conv==="flat"&&c.acc<0)||
+                        (conv==="natural"&&c.acc===0)?0:1;
+    rank.push({notes,root:c,cost,doubles,offConvention});
+  }
+  rank.sort((a,b)=>a.cost-b.cost   || a.doubles-b.doubles ||
+                   a.offConvention-b.offConvention ||
+                   Math.abs(a.root.acc)-Math.abs(b.root.acc));
+  const best=rank[0];
+  const parentPc=(pc-MAJ[mi]+12)%12;                      // the major scale it borrows
+  const j=best.notes.findIndex(n=>pcOf(n)===parentPc);
+  best.parentName=nameOf(best.notes[j]);
+  best.names=best.notes.map(nameOf);
+  best.rootName=nameOf(best.root);
+  return best;
+}
+
+/* ------------------------------------------------------------------ */
+const rootsEl=document.getElementById("roots");
+const modesEl=document.getElementById("modes");
+const infoEl=document.getElementById("info");
+const fbEl=document.getElementById("fb");
+const segEl=document.getElementById("seg");
+
+let sel={root:9,mi:5};        // A Aeolian -- the classic one
+let pref="auto";              // auto | sharp | flat
+let shown=null;               // the scale currently on screen
+
+function renderSeg(){
+  [...segEl.children].forEach(b=>b.classList.toggle("on",b.dataset.p===pref));
+}
+
+function renderRoots(){
+  rootsEl.innerHTML=Array.from({length:12},(_,pc)=>{
+    const label=spellMode(pc,sel.mi,pref).rootName;     // the name you would actually get
+    return `<button class="chip${pc===sel.root?" on":""}" data-r="${pc}">${label}</button>`;
+  }).join("");
+}
+
+function renderModes(){
+  modesEl.innerHTML=MODES.map((m,i)=>
+    `<button class="chip${i===sel.mi?" on":""}" data-m="${i}">${m.name}</button>`).join("");
+}
+
+function renderInfo(){
+  const s=spellMode(sel.root,sel.mi,pref);
+  const steps=MODES[sel.mi].steps
+    .map(x=>x===2?"W":`<span class="h">H</span>`).join(" ");
+  infoEl.innerHTML=
+    `<h2>${s.rootName} <span class="mode">${MODES[sel.mi].name}</span></h2>
+     <div class="notes">${s.names.map((n,i)=>
+       `<span class="note ${i===0?"root":"hit"}">${n}</span>`).join("")}</div>
+     <div class="meta">
+       <span class="steps">${steps}</span>
+       <span class="sep"></span>
+       <span>${MODES[sel.mi].q}</span>
+       <span class="sep"></span>
+       <span>parent <b>${s.parentName} major</b></span>
+     </div>`;
+  return s;
+}
+
+// name every pitch class on the neck using the spelling of the scale on screen
+function neckNames(s){
+  const map={};
+  s.notes.forEach(n=>{const pc=pcOf(n);if(!(pc in map))map[pc]=nameOf(n);});
+  const sharps=s.notes.reduce((k,n)=>k+(n.acc>0?1:0),0);
+  const flats =s.notes.reduce((k,n)=>k+(n.acc<0?1:0),0);
+  const tab=(pref==="flat"||(pref==="auto"&&flats>sharps))?FLAT_TAB:SHARP_TAB;
+  for(let pc=0;pc<12;pc++) if(!(pc in map)) map[pc]=nameOf({letter:tab[pc][0],acc:tab[pc][1]});
+  return map;
+}
+
+function renderFb(s){
+  const names=neckNames(s), rootPc=sel.root;
+  const set=new Set(s.notes.map(pcOf));
+  let h=`<table class="fb" style="--frets:${FRETS}"><thead>
+    <tr><th class="lbl"></th>${Array.from({length:FRETS},(_,f)=>
+      `<th class="f">${f}</th>`).join("")}</tr>
+    <tr class="mk"><th class="lbl"></th>${Array.from({length:FRETS},(_,f)=>
+      `<td>${f===12?'<span class="dot double"></span>'
+                  :MARKERS.includes(f)?'<span class="dot"></span>':""}</td>`).join("")}</tr>
+    </thead><tbody>`;
+  for(let si=STRINGS.length-1;si>=0;si--){
+    h+=`<tr><th class="lbl">${names[STRINGS[si]]}</th>`;
+    for(let f=0;f<FRETS;f++){
+      const pc=(STRINGS[si]+f)%12;
+      const c=pc===rootPc?"root":set.has(pc)?"hit":"off";
+      h+=`<td class="${c}">${names[pc]}</td>`;
+    }
+    h+="</tr>";
+  }
+  fbEl.innerHTML=h+"</tbody></table>";
+}
+
+function render(){
+  renderSeg();
+  renderRoots();
+  renderModes();
+  shown=renderInfo();
+  renderFb(shown);
+}
+
+rootsEl.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-r]");if(!b)return;
+  sel.root=+b.dataset.r;render();
+});
+modesEl.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-m]");if(!b)return;
+  sel.mi=+b.dataset.m;render();
+});
+segEl.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-p]");if(!b)return;
+  pref=b.dataset.p;render();
+});
+
+render();
+</script>
+</body>
+</html>

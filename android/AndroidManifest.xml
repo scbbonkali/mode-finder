@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mode Finder: a WebView whose entire content is assets/mobile.html.
+
+  No permissions are declared at all: the page is local, network loads are
+  blocked in MainActivity, and nothing is ever fetched.
+
+  Versions live here (aapt2 reads them from this manifest; build.sh passes no
+  flags), so this file is the single source of the app's identity.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="net.scbb.modefinder"
+          android:versionCode="1"
+          android:versionName="1.0">
+
+  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
+
+  <application
+      android:label="@string/app_name"
+      android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher"
+      android:theme="@style/AppTheme"
+      android:hardwareAccelerated="true">
+
+    <activity
+        android:name=".MainActivity"
+        android:exported="true"
+        android:launchMode="singleTop"
+        android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density|fontScale|navigation">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

@@ -1,0 +1,66 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Mode Finder</title>
+<style>
+ body{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:20px}
+ table{border-collapse:collapse;margin:10px 0}
+ td,th{padding:4px 8px;border:1px solid #444;text-align:center;font-size:13px}
+ button{background:#222;color:#eee;border:1px solid #555;padding:4px 8px;cursor:pointer}
+ button.sel{background:#3a7;color:#000;font-weight:bold}
+ .fretboard td{width:36px;height:26px;font-size:11px}
+ .hit{background:#3a7;color:#000;font-weight:bold}
+ .root{background:#f80;color:#000;font-weight:bold}
+ .info{background:#1b1b1b;padding:12px;border-radius:8px;max-width:680px;line-height:1.6}
+</style></head><body>
+<h1>Mode Finder</h1>
+<div id="grid"></div>
+<div id="info" class="info"></div>
+<div id="fb"></div>
+<script>
+const SHARP=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const MODES=[
+ {name:"Ionian",steps:[2,2,1,2,2,2,1],q:"Major"},
+ {name:"Dorian",steps:[2,1,2,2,2,1,2],q:"Minor"},
+ {name:"Phrygian",steps:[1,2,2,2,1,2,2],q:"Minor"},
+ {name:"Lydian",steps:[2,2,2,1,2,2,1],q:"Major"},
+ {name:"Mixolydian",steps:[2,2,1,2,2,1,2],q:"Major"},
+ {name:"Aeolian",steps:[2,1,2,2,1,2,2],q:"Minor"},
+ {name:"Locrian",steps:[1,2,2,1,2,2,2],q:"Diminished"}];
+const MAJ=[0,2,4,5,7,9,11];
+const STRINGS=[4,9,2,7,11,4];              // low E A D G B high E
+const FRETS=13;
+function scale(key,mi){
+ const root=(key+MAJ[mi])%12,notes=[root];let p=root;
+ for(let i=0;i<6;i++){p=(p+MODES[mi].steps[i])%12;notes.push(p);}
+ return{root,notes};
+}
+const pat=s=>s.map(x=>x===2?"W":"H").join(" ");
+let sel={key:0,mi:0};
+function renderGrid(){
+ let h="<table><tr><th></th>";
+ MODES.forEach(m=>h+=`<th>${m.name}</th>`);h+="</tr>";
+ for(let k=0;k<12;k++){h+=`<tr><th>${SHARP[k]}</th>`;
+  for(let mi=0;mi<7;mi++){const s=scale(k,mi);
+   h+=`<td><button class="${sel.key===k&&sel.mi===mi?'sel':''}" onclick="pick(${k},${mi})">${SHARP[s.root]}</button></td>`;}
+  h+="</tr>";}
+ document.getElementById("grid").innerHTML=h+"</table>";
+}
+window.pick=(k,mi)=>{sel={key:k,mi};render();};
+function renderInfo(){
+ const{key,mi}=sel,{root,notes}=scale(key,mi),nn=notes.map(n=>SHARP[n]);
+ document.getElementById("info").innerHTML=
+  `<b>${SHARP[root]} ${MODES[mi].name}</b><br>
+   The notes of the ${SHARP[key]} Major scale played over the ${SHARP[root]} ${MODES[mi].q} chord<br>
+   Notes: <b>${nn.join(" ")}</b><br>Interval: <b>${pat(MODES[mi].steps)}</b>`;
+ return{root,notes};
+}
+function renderFb(root,notes){
+ const set=new Set(notes);let h="<table class='fretboard'><tr><th></th>";
+ for(let f=0;f<FRETS;f++)h+=`<th>${f}</th>`;h+="</tr>";
+ for(let si=STRINGS.length-1;si>=0;si--){h+=`<tr><th>${SHARP[STRINGS[si]]}</th>`;
+  for(let f=0;f<FRETS;f++){const n=(STRINGS[si]+f)%12;let c=(n===root)?"root":(set.has(n)?"hit":"");
+   h+=`<td class="${c}">${SHARP[n]}</td>`;}
+  h+="</tr>";}
+ document.getElementById("fb").innerHTML=h+"</table>";
+}
+function render(){renderGrid();const{root,notes}=renderInfo();renderFb(root,notes);}
+render();
+</script></body></html>
